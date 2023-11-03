@@ -93,3 +93,42 @@ export const secondMailForVerification = async (userAccount: any) => {
     console.log(error);
   }
 };
+
+export const resetPasswordMail = async (userAccount: any) => {
+  try {
+    const access: any = (await oAuth.getAccessToken()).token;
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        type: "OAuth2",
+        user: "codelabbest@gmail.com",
+        clientId: googleID,
+        clientSecret: googleSecret,
+        refreshToken: googleRefresh,
+        accessToken: access,
+      },
+    });
+
+    const token = jwt.sign({ id: userAccount?.id }, "password");
+
+    const userData = {
+      name: userAccount?.name,
+      email: userAccount?.email,
+      url: `http://localhost:4983/api/${token}/reset-password`,
+    };
+
+    const readFile = path.join(__dirname, "../view/resetPassword.ejs");
+    const actualData = await ejs.renderFile(readFile, userData);
+
+    const mailer = {
+      from: "<codelabbest@gmail.com>",
+      to: userAccount?.email,
+      subject: `Welcome${userAccount?.name}, Reset your Password`,
+      html: actualData,
+    };
+    transporter.sendMail(mailer);
+  } catch (error: any) {
+    console.log(error);
+  }
+};

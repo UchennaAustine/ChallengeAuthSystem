@@ -4,11 +4,18 @@ import { statusCode } from "../utils/statusCode";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { firstMailWithOtp, secondMailForVerification } from "../utils/email";
+import {
+  firstMailWithOtp,
+  resetPasswordMail,
+  secondMailForVerification,
+} from "../utils/email";
 
 const prisma = new PrismaClient();
 
-export const Register = async (req: Request, res: Response) => {
+export const Register = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   try {
     const { name, email, password } = req.body;
 
@@ -158,6 +165,98 @@ export const SignIn = async (
     return res.status(statusCode.BAD_REQUEST).json({
       message: "error signing in auth",
       data: error.message,
+    });
+  }
+};
+
+export const resetPassword = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { email } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (user?.verified && user?.token === "") {
+      const token = jwt.sign({ id: user?.id }, "password");
+
+      const passwordReset = await prisma.user.update({
+        where: { id: user?.id },
+        data: { token },
+      });
+
+      resetPasswordMail(passwordReset).then(() => {
+        console.log("A Mail has being sent....");
+      });
+
+      return res.status(statusCode.CREATED).json({
+        message: "success",
+        data: passwordReset,
+      });
+    } else {
+      return res.status(statusCode.FORBIDDEN).json({
+        message: "Unauthorised Action",
+      });
+    }
+  } catch (error) {
+    return res.status(statusCode.BAD_REQUEST).json({
+      message: `Reset Password Error: ${error.message}
+      `,
+      info: error,
+    });
+  }
+};
+
+export const changePassword = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const userID: any = jwt.verify(
+      token,
+      "password",
+      (err: any, payload: any) => {
+        if (err) {
+          return new Error();
+        } else {
+          return payload;
+        }
+      }
+    );
+
+    const user = await prisma.user.findUnique({
+      where: { id: userID?.id },
+    });
+
+    if (user?.verified && user?.token !== "") {
+      const locker = await bcrypt.genSalt(10);
+      const encryption = await bcrypt.hash(password, locker);
+
+      const userUpdate = await prisma.user.update({
+        where: { id: user?.id },
+        data: { password: encryption, token: "" },
+      });
+
+      return res.status(statusCode.CREATED).json({
+        message: `${user?.name}: your password have being changed`,
+        data: userUpdate,
+      });
+    } else {
+      return res.status(statusCode.BAD_REQUEST).json({
+        message: `Please Verify your account`,
+      });
+    }
+  } catch (error: any) {
+    return res.status(statusCode.BAD_REQUEST).json({
+      message: `Change Password Error: ${error.message}
+      `,
+      info: error,
     });
   }
 };
