@@ -117,7 +117,7 @@ export const SecondVerification = async (req: Request, res: Response) => {
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     return res.status(statusCode.BAD_REQUEST).json({
       message: `Second Verification Error: ${error.message}
       `,
@@ -201,7 +201,7 @@ export const resetPassword = async (
         message: "Unauthorised Action",
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     return res.status(statusCode.BAD_REQUEST).json({
       message: `Reset Password Error: ${error.message}
       `,
